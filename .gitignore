@@ -1,0 +1,32 @@
+# Android / Gradle
+android/.gradle/
+android/.kotlin/
+android/.idea/
+android/**/build/
+android/local.properties
+android/.home-sdk/
+*.jks
+*.keystore
+
+# ESP-IDF / ESP-Matter
+firmware/**/build/
+firmware/**/sdkconfig
+firmware/**/sdkconfig.old
+firmware/**/managed_components/
+esp-matter-sdk/
+dependencies.lock
+dependencies.lock.tmp
+
+# Private production credentials
+*.pem
+*.key
+*.p12
+*.pfx
+factory_data/
+credentials/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.iml
+.diagnostics/

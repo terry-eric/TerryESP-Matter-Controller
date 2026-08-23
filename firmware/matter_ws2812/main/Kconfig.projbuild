@@ -1,0 +1,25 @@
+menu "WS2812 Matter light"
+
+config WS2812_GPIO
+    int "WS2812 data GPIO"
+    default 10
+    range 0 21
+    help
+        GPIO connected to the DIN input of the WS2812 strip.
+
+config WS2812_NUM_LEDS
+    int "Number of WS2812 LEDs"
+    default 256
+    range 1 1024
+    help
+        Number of addressable pixels in the strip.
+
+config WS2812_MAX_BRIGHTNESS
+    int "Maximum strip brightness percent"
+    default 60
+    range 1 100
+    help
+        Safety cap for the strip output. Verify the strip power supply before
+        increasing this value, especially when using many pixels at white.
+
+endmenu
