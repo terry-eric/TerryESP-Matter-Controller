@@ -16,6 +16,31 @@ TerryESP Controller 是一套用於 ESP32-C3 與 WS2812 燈條的 Android App／
 - Matter／Google Home 配對、家庭與房間同步
 - 純本地模式不必登入 Google；只有 Matter／Google Home 功能需要 Google 帳號
 
+## 介面預覽
+
+<table>
+  <tr>
+    <th>家庭與房間</th>
+    <th>統一控制</th>
+    <th>燈效調整</th>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/home.jpg" width="260" alt="家庭與房間首頁"></td>
+    <td><img src="docs/screenshots/unified-color.jpg" width="260" alt="統一亮度與顏色控制"></td>
+    <td><img src="docs/screenshots/unified-effects.jpg" width="260" alt="內建燈效與呼吸設定"></td>
+  </tr>
+  <tr>
+    <th>自訂燈條</th>
+    <th>家庭與設定</th>
+    <th></th>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/custom-strip.jpg" width="260" alt="逐顆 LED 自訂燈條"></td>
+    <td><img src="docs/screenshots/settings-redacted.png" width="260" alt="Google Home 家庭與設定"></td>
+    <td></td>
+  </tr>
+</table>
+
 ## 控制方式
 
 | 功能 | 同一 Wi-Fi | 外部網路 |
