@@ -49,6 +49,8 @@ class BleProvisioningController(context: Context) {
     }
 
     fun startScan() {
+        if (_phase.value in setOf(BleProvisionPhase.SCANNING, BleProvisionPhase.CONNECTING,
+                BleProvisionPhase.PROVISIONING, BleProvisionPhase.DISCOVERING)) return
         _candidates.value = emptyList()
         _message.value = null
         _phase.value = BleProvisionPhase.SCANNING
@@ -71,6 +73,8 @@ class BleProvisioningController(context: Context) {
     }
 
     fun connect(candidate: BleProvisionCandidate) {
+        if (_phase.value in setOf(BleProvisionPhase.CONNECTING, BleProvisionPhase.CONNECTED,
+                BleProvisionPhase.PROVISIONING, BleProvisionPhase.DISCOVERING)) return
         manager.stopBleScan()
         _phase.value = BleProvisionPhase.CONNECTING
         _message.value = null
@@ -87,6 +91,7 @@ class BleProvisioningController(context: Context) {
     }
 
     fun provision(ssid: String, password: String) {
+        if (_phase.value != BleProvisionPhase.CONNECTED) return
         val device = espDevice ?: return fail("藍牙裝置尚未連線")
         _phase.value = BleProvisionPhase.PROVISIONING
         _message.value = "正在將 Wi-Fi 資料傳給 ESP…"

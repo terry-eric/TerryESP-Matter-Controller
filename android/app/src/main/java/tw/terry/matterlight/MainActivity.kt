@@ -90,8 +90,8 @@ class MainActivity : ComponentActivity() {
     private var googleAccountEmail by mutableStateOf<String?>(null)
     private var useLocalMode by mutableStateOf(false)
     private var commissioningRecoveryMessage by mutableStateOf<String?>(null)
+    private var commissioningInProgress = false
     private var devicesBeforeCommissioning = emptySet<String>()
-    private var localSetupRequest by mutableStateOf(0)
     private var pendingGoogleMatterCommissioning = false
     private var pendingLocalMatterTarget: LightDevice? = null
     private var commissioningLocalDeviceId: String? = null
@@ -108,20 +108,24 @@ class MainActivity : ComponentActivity() {
                     pendingGoogleMatterCommissioning = false
                     val target = pendingLocalMatterTarget
                     pendingLocalMatterTarget = null
+                    commissioningInProgress = false
                     startGoogleCommissioning(target)
                 }
             } catch (error: ApiException) {
+                commissioningInProgress = false
+                pendingGoogleMatterCommissioning = false
+                pendingLocalMatterTarget = null
                 Log.e("MatterLight", "Google sign-in failed", error)
             }
         }
 
     private val commissioningLauncher =
         registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
+            commissioningInProgress = false
             if (result.resultCode == RESULT_OK) {
                 val resultData = CommissioningResult.fromIntentSenderResult(result.resultCode, result.data)
                 Log.i("MatterLight", "Matter commissioning completed: ${resultData.deviceName ?: "unnamed device"}")
                 val localDeviceId = commissioningLocalDeviceId
-                if (localDeviceId == null) localSetupRequest += 1
                 if (googleAccountEmail != null) {
                     GoogleHomeBridge.connect(applicationContext, this)
                     lifecycleScope.launch {
@@ -174,7 +178,6 @@ class MainActivity : ComponentActivity() {
                 },
                 commissioningRecoveryMessage = commissioningRecoveryMessage,
                 onDismissCommissioningRecovery = { commissioningRecoveryMessage = null },
-                localSetupRequest = localSetupRequest,
             )
         }
     }
@@ -197,6 +200,11 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun startGoogleCommissioning(target: LightDevice? = null) {
+        if (commissioningInProgress) {
+            Log.i("MatterLight", "Ignoring duplicate Matter commissioning request")
+            return
+        }
+        commissioningInProgress = true
         if (googleAccountEmail == null) {
             pendingGoogleMatterCommissioning = true
             pendingLocalMatterTarget = target
@@ -221,7 +229,10 @@ class MainActivity : ComponentActivity() {
                 commissioningLauncher.launch(IntentSenderRequest.Builder(sender).build())
             }
             .addOnFailureListener { error ->
+                commissioningInProgress = false
+                commissioningLocalDeviceId = null
                 Log.e("MatterLight", "Unable to start Matter commissioning", error)
+                commissioningRecoveryMessage = "無法啟動 Matter 配對，請稍後再試。"
             }
     }
 
@@ -286,7 +297,6 @@ fun MatterLightApp(
     onUseLocalMode: () -> Unit = {},
     commissioningRecoveryMessage: String? = null,
     onDismissCommissioningRecovery: () -> Unit = {},
-    localSetupRequest: Int = 0,
 ) {
     val devices by viewModel.devices.collectAsState()
     val rooms by viewModel.rooms.collectAsState()
@@ -303,12 +313,6 @@ fun MatterLightApp(
     var selectedDeviceId by remember { mutableStateOf<String?>(null) }
     val customDevice = devices.firstOrNull { it.id == customDeviceId }
     val selectedDevice = devices.firstOrNull { it.id == selectedDeviceId }
-    LaunchedEffect(localSetupRequest) {
-        if (localSetupRequest > 0) {
-            localBindingDeviceId = null
-            showLocalSetup = true
-        }
-    }
     TerryMaterialTheme {
         if (commissioningRecoveryMessage != null) {
             AlertDialog(
