@@ -14,8 +14,8 @@ android {
         applicationId = "tw.terry.matterlight"
         minSdk = 29
         targetSdk = 35
-        versionCode = 12
-        versionName = "0.4.4"
+        versionCode = 13
+        versionName = "0.4.5"
         buildConfigField(
             "String",
             "DEFAULT_WEB_CLIENT_ID",

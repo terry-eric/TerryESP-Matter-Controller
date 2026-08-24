@@ -527,7 +527,13 @@ private fun DeviceControlPage(
                         Spacer(Modifier.width(14.dp))
                         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             Surface(Modifier.size(38.dp), CircleShape, selectedColor, border = BorderStroke(2.dp, Color.White)) {}
-                            Surface(Modifier.size(38.dp), CircleShape, Color.White, border = BorderStroke(1.dp, TerryOutline)) {}
+                            Surface(
+                                modifier = Modifier.size(38.dp),
+                                shape = CircleShape,
+                                color = Color.White,
+                                border = BorderStroke(1.dp, TerryOutline),
+                                onClick = { selectedColor = Color.White; onColor(Color.White) },
+                            ) {}
                         }
                     }
                 }
@@ -1072,7 +1078,11 @@ private fun ColorWheel(color: Color, diameter: androidx.compose.ui.unit.Dp, onCo
         val maxRadius = minOf(width, height) / 2f
         if (radius > maxRadius) return null
         val hue = ((atan2(dy, dx) * 180f / PI.toFloat()) + 360f) % 360f
-        return Color.hsv(hue, (radius / maxRadius).coerceIn(.08f, 1f), 1f)
+        // A linear radius leaves too much of the wheel looking pastel. Applying
+        // a square-root curve reaches vivid colors sooner while preserving a
+        // small low-saturation area in the center for intentional white tones.
+        val normalizedRadius = (radius / maxRadius).coerceIn(0f, 1f)
+        return Color.hsv(hue, sqrt(normalizedRadius).coerceIn(.12f, 1f), 1f)
     }
     Canvas(
         Modifier.size(diameter)

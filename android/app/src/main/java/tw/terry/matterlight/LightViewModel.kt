@@ -6,6 +6,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import java.util.UUID
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -42,6 +43,7 @@ class LightViewModel(application: Application) : AndroidViewModel(application) {
     val messages = _messages.asSharedFlow()
     private val controlLocks = mutableMapOf<String, Mutex>()
     private val colorJobs = mutableMapOf<String, Job>()
+    private val colorCommandVersions = mutableMapOf<String, Int>()
     private val powerCommandVersions = mutableMapOf<String, Int>()
     private val recoveringEndpoints = mutableSetOf<String>()
     private val localDiscovery = LocalEspDiscovery(application) { candidate ->
@@ -337,21 +339,35 @@ class LightViewModel(application: Application) : AndroidViewModel(application) {
         // The color wheel emits many drag events. Update the preview immediately,
         // then send only the newest value so the ESP is not flooded with sockets.
         updateState(id) { it.copy(color = color, effect = LightEffect.STATIC, isOn = true) }
+        val version = (colorCommandVersions[id] ?: 0) + 1
+        colorCommandVersions[id] = version
         colorJobs.remove(id)?.cancel()
         colorJobs[id] = viewModelScope.launch {
-            delay(100)
-            val device = _devices.value.firstOrNull { it.id == id } ?: return@launch
-            runCatching {
-                controlLocks.getOrPut(id) { Mutex() }.withLock {
-                    routeBasicControl(
-                        id = id,
-                        device = device,
-                        localAction = { LocalEspApi.setColor(device, color) },
-                        cloudAction = { GoogleHomeBridge.setColor(id, color) },
-                    )
+            try {
+                delay(140)
+                if (colorCommandVersions[id] != version) return@launch
+                val device = _devices.value.firstOrNull { it.id == id } ?: return@launch
+                runCatching {
+                    controlLocks.getOrPut(id) { Mutex() }.withLock {
+                        if (colorCommandVersions[id] != version) return@withLock
+                        routeBasicControl(
+                            id = id,
+                            device = device,
+                            localAction = { LocalEspApi.setColor(device, color) },
+                            cloudAction = { GoogleHomeBridge.setColor(id, color) },
+                        )
+                    }
+                }.onFailure { error ->
+                    // HttpURLConnection is blocking, so cancelling an older color
+                    // job can finish as an IOException instead of CancellationException.
+                    // Only the newest request is allowed to notify the user.
+                    if (error !is CancellationException && colorCommandVersions[id] == version) {
+                        reportControlFailure("顏色", error)
+                    }
                 }
-            }.onFailure { reportControlFailure("顏色", it) }
-            colorJobs.remove(id)
+            } finally {
+                if (colorCommandVersions[id] == version) colorJobs.remove(id)
+            }
         }
     }
 

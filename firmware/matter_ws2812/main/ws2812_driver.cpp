@@ -119,8 +119,15 @@ Palette effect_palette(app_effect_t effect)
 
 uint8_t scale(uint8_t value, uint8_t brightness)
 {
-    const uint16_t capped = std::min<uint16_t>(brightness, CONFIG_WS2812_MAX_BRIGHTNESS * 254 / 100);
-    return static_cast<uint8_t>((static_cast<uint16_t>(value) * capped) / 254);
+    // Map the full Matter 0..254 range onto the configured electrical safety
+    // cap. The old implementation clipped at the cap, so every App value above
+    // 60% produced exactly the same output. A square curve gives the slider a
+    // more even perceived response to human vision while preserving 100% as
+    // the configured maximum rather than the strip's unrestricted maximum.
+    const float requested = static_cast<float>(brightness) / 254.0f;
+    const float safety_cap = static_cast<float>(CONFIG_WS2812_MAX_BRIGHTNESS) / 100.0f;
+    const float output = requested * requested * safety_cap;
+    return static_cast<uint8_t>(std::clamp(static_cast<float>(value) * output, 0.0f, 255.0f));
 }
 
 void hsv_to_rgb(uint8_t hue, uint8_t saturation, uint8_t value, uint8_t &red, uint8_t &green, uint8_t &blue)

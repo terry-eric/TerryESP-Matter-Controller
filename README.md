@@ -52,6 +52,22 @@ TerryESP Controller 是一套用於 ESP32-C3 與 WS2812 燈條的 Android App／
 
 手機改用行動網路時，本地 API 無法連到家中的 ESP 是正常現象；已加入 Matter 的裝置仍可透過 Google Home 控制基本燈光。自訂動畫不是標準 Matter 燈具功能，目前必須與 ESP 在同一個 Wi-Fi。
 
+### 顏色與亮度操作
+
+- 調色盤越靠外圈顏色越鮮豔，靠近中心則逐漸變成低飽和度淡色；旁邊的白色圓鈕可直接選白色。
+- App 會合併快速連續的選色操作，只把最新顏色送出；已取消或已過期的舊請求不會再顯示錯誤通知。
+- App 的亮度 1～100% 會完整映射到韌體設定的安全輸出範圍，不會再於約 60% 提前截平。
+- 預設安全上限仍是燈條額定輸出的 60%。因此 App 的 100% 代表「目前安全上限」，不是繞過電流限制的硬體滿功率。
+
+若高亮度時出現末端偏色、閃爍、ESP 重啟或電源線發熱，通常是電源供應、壓降或線徑問題，請立即降低亮度並改善供電；不要只提高韌體上限。
+
+## 0.4.5 更新內容
+
+- 修正快速選色時燈條已成功變色，App 卻顯示「顏色設定失敗」的競態問題。
+- 調整調色盤飽和度曲線，讓內圈以外的顏色更鮮豔。
+- 白色快捷圓鈕現在可以直接操作。
+- 修正亮度超過安全上限百分比後完全沒有變化；現在 1～100% 全段都有作用。
+
 ## 快速開始
 
 ### 1. 安裝 Android App
@@ -60,12 +76,12 @@ TerryESP Controller 是一套用於 ESP32-C3 與 WS2812 燈條的 Android App／
 
 從 [GitHub Releases](https://github.com/terry-eric/TerryESP-Matter-Controller/releases) 下載最新版，或直接下載：
 
-- [TerryESP Controller v0.4.4 APK](https://github.com/terry-eric/TerryESP-Matter-Controller/releases/download/v0.4.4/TerryESP-Controller-v0.4.4-debug.apk)
+- [TerryESP Controller v0.4.5 APK](https://github.com/terry-eric/TerryESP-Matter-Controller/releases/download/v0.4.5/TerryESP-Controller-v0.4.5-debug.apk)
 
 若使用 ADB：
 
 ```powershell
-adb install -r TerryESP-Controller-v0.4.4-debug.apk
+adb install -r TerryESP-Controller-v0.4.5-debug.apk
 ```
 
 這是 debug APK。Android 可能要求允許「安裝未知應用程式」，Google 登入測試也必須把實際簽章 SHA-1／SHA-256 設定到對應的 Google Cloud／Google Home 專案。
@@ -125,7 +141,7 @@ Matter 裝置的家庭與房間以 Google Home 為準，App 會同步顯示；�
 py -m pip install esptool
 ```
 
-全新 ESP 或需要完整重建分割區時，在 `release\firmware-v0.4.4` 執行：
+全新 ESP 或需要完整重建分割區時，在 `release\firmware-v0.4.5` 執行：
 
 ```powershell
 py -m esptool --chip esp32c3 --port COM7 --baud 460800 write-flash `
@@ -179,7 +195,7 @@ idf.py flash monitor
 android/                         Android Compose App
 firmware/matter_ws2812/          ESP32-C3 ESP-Matter 韌體
 release/                         可直接燒錄的 ESP 測試韌體
-  firmware-v0.4.4/
+  firmware-v0.4.5/
 README.md
 ```
 
