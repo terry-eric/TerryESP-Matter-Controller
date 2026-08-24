@@ -365,6 +365,7 @@ fun MatterLightApp(
                         viewModel.addLocalDevice(
                             result.name, result.room, result.host, result.localKey, result.deviceId,
                         )
+                        selectedRoom = result.room.trim().ifEmpty { rooms.firstOrNull() ?: "未分類" }
                     }
                     localBindingDeviceId = null
                     showBleSetup = false

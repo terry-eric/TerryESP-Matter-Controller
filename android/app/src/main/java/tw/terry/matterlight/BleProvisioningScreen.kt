@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -22,6 +23,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -59,6 +61,9 @@ fun BleProvisioningScreen(
     var selected by remember { mutableStateOf<BleProvisionCandidate?>(null) }
     var ssid by remember { mutableStateOf("") }
     var ssidWasAutoFilled by remember { mutableStateOf(false) }
+    var wifiAutofillAttempted by remember { mutableStateOf(false) }
+    var wifiFrequencyMhz by remember { mutableStateOf<Int?>(null) }
+    var showWifiBandWarning by remember { mutableStateOf(false) }
     var password by remember { mutableStateOf("") }
     var room by remember(rooms) { mutableStateOf(rooms.firstOrNull() ?: "未分類") }
     var discovered by remember { mutableStateOf(emptyList<LocalEspCandidate>()) }
@@ -77,6 +82,7 @@ fun BleProvisioningScreen(
                 Manifest.permission.BLUETOOTH_SCAN,
                 Manifest.permission.BLUETOOTH_CONNECT,
                 Manifest.permission.NEARBY_WIFI_DEVICES,
+                Manifest.permission.ACCESS_FINE_LOCATION,
             )
             Build.VERSION.SDK_INT >= 31 -> arrayOf(
                 Manifest.permission.BLUETOOTH_SCAN,
@@ -87,11 +93,19 @@ fun BleProvisioningScreen(
         }
     }
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
-        if (result.values.all { it }) {
-            currentWifiSsid(context)?.let {
-                ssid = it
-                ssidWasAutoFilled = true
-            }
+        wifiAutofillAttempted = true
+        currentWifiNetwork(context)?.let {
+            ssid = it.ssid
+            wifiFrequencyMhz = it.frequencyMhz
+            ssidWasAutoFilled = true
+        }
+        val bluetoothGranted = when {
+            Build.VERSION.SDK_INT >= 31 ->
+                result[Manifest.permission.BLUETOOTH_SCAN] != false &&
+                    result[Manifest.permission.BLUETOOTH_CONNECT] != false
+            else -> result[Manifest.permission.ACCESS_FINE_LOCATION] != false
+        }
+        if (bluetoothGranted) {
             controller.startScan()
         }
     }
@@ -108,10 +122,7 @@ fun BleProvisioningScreen(
         }
     }
     LaunchedEffect(Unit) {
-        currentWifiSsid(context)?.let {
-            ssid = it
-            ssidWasAutoFilled = true
-        }
+        permissionLauncher.launch(permissions)
     }
     LaunchedEffect(phase, pairingInfo, discovered, verificationRetry) {
         val info = pairingInfo ?: return@LaunchedEffect
@@ -179,21 +190,63 @@ fun BleProvisioningScreen(
             OutlinedTextField(ssid, {
                 ssid = it
                 ssidWasAutoFilled = false
+                wifiFrequencyMhz = null
             }, label = { Text("Wi-Fi 名稱") }, singleLine = true,
                 modifier = Modifier.fillMaxWidth())
             if (ssidWasAutoFilled) {
                 Text("已帶入手機目前連線的 Wi-Fi，尚未傳送。",
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
+            } else if (wifiAutofillAttempted && ssid.isBlank()) {
+                Text(
+                    "無法自動讀取目前 Wi-Fi。請確認已允許精確位置並開啟手機定位，或手動輸入 2.4 GHz Wi-Fi 名稱。",
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+            if (wifiFrequencyMhz?.let { !is2_4Ghz(it) } == true) {
+                Text(
+                    "目前手機連線為 ${formatWifiBand(wifiFrequencyMhz!!)}。ESP32-C3 僅支援 2.4 GHz；若路由器沒有同名 2.4 GHz 網路，配網會失敗。",
+                    color = MaterialTheme.colorScheme.error,
+                    fontWeight = FontWeight.SemiBold,
+                )
             }
             OutlinedTextField(password, { password = it }, label = { Text("Wi-Fi 密碼") }, singleLine = true,
                 visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
             OutlinedTextField(room, { room = it }, label = { Text("房間") }, singleLine = true,
                 modifier = Modifier.fillMaxWidth())
             Button(
-                onClick = { controller.provision(ssid.trim(), password) },
+                onClick = {
+                    val currentNetwork = currentWifiNetwork(context)
+                    val currentFrequency = currentNetwork
+                        ?.takeIf { it.ssid == ssid.trim() }
+                        ?.frequencyMhz
+                    wifiFrequencyMhz = currentFrequency ?: wifiFrequencyMhz
+                    if ((currentFrequency ?: wifiFrequencyMhz)?.let { !is2_4Ghz(it) } == true) {
+                        showWifiBandWarning = true
+                    } else {
+                        controller.provision(ssid.trim(), password)
+                    }
+                },
                 enabled = ssid.isNotBlank() && room.isNotBlank() && pairingInfo != null && phase == BleProvisionPhase.CONNECTED,
                 modifier = Modifier.fillMaxWidth(),
             ) { Text("傳送 Wi-Fi 設定") }
+        }
+        if (showWifiBandWarning) {
+            AlertDialog(
+                onDismissRequest = { showWifiBandWarning = false },
+                title = { Text("目前不是 2.4 GHz Wi-Fi") },
+                text = {
+                    Text("手機目前連線到 ${wifiFrequencyMhz?.let(::formatWifiBand) ?: "5/6 GHz"}。ESP32-C3 只能連接 2.4 GHz。請先切換到 2.4 GHz；若路由器的 2.4 GHz 與 5 GHz 使用相同名稱，也可以選擇繼續。")
+                },
+                confirmButton = {
+                    Button(onClick = {
+                        showWifiBandWarning = false
+                        controller.provision(ssid.trim(), password)
+                    }) { Text("仍要繼續") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showWifiBandWarning = false }) { Text("返回切換 Wi-Fi") }
+                },
+            )
         }
         if (phase == BleProvisionPhase.DISCOVERING || phase == BleProvisionPhase.SUCCESS) {
             Text("ESP 正在重新啟動；App 會按固定裝置 ID 自動搜尋、驗證並加入。")
@@ -216,12 +269,26 @@ fun BleProvisioningScreen(
     }
 }
 
-private fun currentWifiSsid(context: Context): String? = runCatching {
+private data class CurrentWifiNetwork(val ssid: String, val frequencyMhz: Int?)
+
+private fun currentWifiNetwork(context: Context): CurrentWifiNetwork? = runCatching {
     @Suppress("DEPRECATION")
-    val raw = context.applicationContext.getSystemService(WifiManager::class.java)
-        ?.connectionInfo?.ssid
-        ?.trim()
+    val info = context.applicationContext.getSystemService(WifiManager::class.java)
+        ?.connectionInfo
         ?: return@runCatching null
-    raw.removeSurrounding("\"")
-        .takeIf { it.isNotBlank() && it != WifiManager.UNKNOWN_SSID && it != "<unknown ssid>" }
+    val ssid = info.ssid
+        ?.trim()
+        ?.removeSurrounding("\"")
+        ?.takeIf { it.isNotBlank() && it != WifiManager.UNKNOWN_SSID && it != "<unknown ssid>" }
+        ?: return@runCatching null
+    CurrentWifiNetwork(ssid, info.frequency.takeIf { it > 0 })
 }.getOrNull()
+
+private fun is2_4Ghz(frequencyMhz: Int): Boolean = frequencyMhz in 2_400..2_500
+
+private fun formatWifiBand(frequencyMhz: Int): String = when (frequencyMhz) {
+    in 2_400..2_500 -> "2.4 GHz"
+    in 4_900..5_900 -> "5 GHz"
+    in 5_925..7_125 -> "6 GHz"
+    else -> "$frequencyMhz MHz"
+}

@@ -49,7 +49,11 @@ class LightViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     init {
-        loadLocalDevices().forEach { localDevices[it.id] = it }
+        val savedLocalDevices = loadLocalDevices()
+        savedLocalDevices.forEach { localDevices[it.id] = it }
+        if (savedLocalDevices.isNotEmpty()) {
+            saveRooms((_rooms.value + savedLocalDevices.map { it.room }).distinct())
+        }
         publishDevices()
         localDiscovery.start()
         viewModelScope.launch {
@@ -146,10 +150,14 @@ class LightViewModel(application: Application) : AndroidViewModel(application) {
                 existingId != id && device.localKey.equals(key, ignoreCase = true)
             }
         }
+        val resolvedRoom = room.trim().ifEmpty { _rooms.value.firstOrNull() ?: "未分類" }
+        if (resolvedRoom !in _rooms.value) {
+            saveRooms(_rooms.value + resolvedRoom)
+        }
         localDevices[id] = LightDevice(
             id = id,
             name = name.ifBlank { "TerryESP Controller" },
-            room = room.ifBlank { _rooms.value.firstOrNull() ?: "未分類" },
+            room = resolvedRoom,
             isOnline = true,
             isOn = true,
             brightness = 50,
