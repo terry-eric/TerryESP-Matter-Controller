@@ -12,6 +12,8 @@
 #include <esp_mac.h>
 #include <esp_random.h>
 #include <nvs.h>
+#include <app/server/Server.h>
+#include <platform/CHIPDeviceLayer.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <lwip/inet.h>
@@ -94,6 +96,28 @@ esp_err_t auth_handler(httpd_req_t *request)
         return ESP_FAIL;
     }
     send_json(request, "{\"ok\":true}");
+    return ESP_OK;
+}
+
+void open_matter_commissioning_window(intptr_t)
+{
+    auto &manager = chip::Server::GetInstance().GetCommissioningWindowManager();
+    const CHIP_ERROR result = manager.OpenBasicCommissioningWindow();
+    if (result != CHIP_NO_ERROR) {
+        ESP_LOGE(TAG, "Unable to open Matter commissioning window: %s", result.AsString());
+    } else {
+        ESP_LOGI(TAG, "Matter commissioning window opened from local API");
+    }
+}
+
+esp_err_t matter_open_handler(httpd_req_t *request)
+{
+    if (!request_is_authorized(request)) {
+        httpd_resp_send_err(request, HTTPD_401_UNAUTHORIZED, "Invalid local key");
+        return ESP_FAIL;
+    }
+    chip::DeviceLayer::PlatformMgr().ScheduleWork(open_matter_commissioning_window, 0);
+    send_json(request, "{\"ok\":true,\"commissioning\":\"opening\"}");
     return ESP_OK;
 }
 
@@ -341,7 +365,7 @@ esp_err_t local_api_start(app_driver_handle_t strip)
     httpd_handle_t server = nullptr;
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.stack_size = 8192;
-    config.max_uri_handlers = 6;
+    config.max_uri_handlers = 7;
     ESP_RETURN_ON_ERROR(httpd_start(&server, &config), TAG, "HTTP start failed");
     const httpd_uri_t info = {.uri = "/api/v1/info", .method = HTTP_GET, .handler = info_handler};
     const httpd_uri_t auth = {.uri = "/api/v1/auth", .method = HTTP_GET, .handler = auth_handler};
@@ -349,12 +373,14 @@ esp_err_t local_api_start(app_driver_handle_t strip)
     const httpd_uri_t state = {.uri = "/api/v1/state", .method = HTTP_POST, .handler = state_handler};
     const httpd_uri_t custom = {.uri = "/api/v1/custom", .method = HTTP_POST, .handler = custom_handler};
     const httpd_uri_t rotate_key = {.uri = "/api/v1/key", .method = HTTP_POST, .handler = rotate_key_handler};
+    const httpd_uri_t matter_open = {.uri = "/api/v1/matter/open", .method = HTTP_POST, .handler = matter_open_handler};
     ESP_RETURN_ON_ERROR(httpd_register_uri_handler(server, &info), TAG, "register info failed");
     ESP_RETURN_ON_ERROR(httpd_register_uri_handler(server, &auth), TAG, "register auth failed");
     ESP_RETURN_ON_ERROR(httpd_register_uri_handler(server, &effect), TAG, "register effect failed");
     ESP_RETURN_ON_ERROR(httpd_register_uri_handler(server, &state), TAG, "register state failed");
     ESP_RETURN_ON_ERROR(httpd_register_uri_handler(server, &custom), TAG, "register custom failed");
     ESP_RETURN_ON_ERROR(httpd_register_uri_handler(server, &rotate_key), TAG, "register key rotation failed");
+    ESP_RETURN_ON_ERROR(httpd_register_uri_handler(server, &matter_open), TAG, "register Matter open failed");
     if (xTaskCreate(discovery_task, "terryesp_discovery", 3072, nullptr, 4, nullptr) != pdPASS) {
         return ESP_ERR_NO_MEM;
     }

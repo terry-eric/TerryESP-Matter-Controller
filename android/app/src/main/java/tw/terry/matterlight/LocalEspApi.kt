@@ -13,6 +13,9 @@ object LocalEspApi {
     suspend fun verify(hostAndPort: String, key: String) =
         request(hostAndPort, key, "/api/v1/auth")
 
+    suspend fun openMatterCommissioning(device: LightDevice) =
+        request(device, "/api/v1/matter/open", "open=1")
+
     suspend fun setEffect(device: LightDevice, effect: LightEffect) = request(
         device,
         "/api/v1/effect?effect=" + URLEncoder.encode(effect.name.lowercase(), "UTF-8") +

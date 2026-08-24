@@ -60,12 +60,12 @@ TerryESP Controller 是一套用於 ESP32-C3 與 WS2812 燈條的 Android App／
 
 從 [GitHub Releases](https://github.com/terry-eric/TerryESP-Matter-Controller/releases) 下載最新版，或直接下載：
 
-- [TerryESP Controller v0.4.3 APK](https://github.com/terry-eric/TerryESP-Matter-Controller/releases/download/v0.4.3/TerryESP-Controller-v0.4.3-debug.apk)
+- [TerryESP Controller v0.4.4 APK](https://github.com/terry-eric/TerryESP-Matter-Controller/releases/download/v0.4.4/TerryESP-Controller-v0.4.4-debug.apk)
 
 若使用 ADB：
 
 ```powershell
-adb install -r TerryESP-Controller-v0.4.3-debug.apk
+adb install -r TerryESP-Controller-v0.4.4-debug.apk
 ```
 
 這是 debug APK。Android 可能要求允許「安裝未知應用程式」，Google 登入測試也必須把實際簽章 SHA-1／SHA-256 設定到對應的 Google Cloud／Google Home 專案。
@@ -125,7 +125,7 @@ Matter 裝置的家庭與房間以 Google Home 為準，App 會同步顯示；�
 py -m pip install esptool
 ```
 
-全新 ESP 或需要完整重建分割區時，在 `release\firmware-v0.4.0` 執行：
+全新 ESP 或需要完整重建分割區時，在 `release\firmware-v0.4.4` 執行：
 
 ```powershell
 py -m esptool --chip esp32c3 --port COM7 --baud 460800 write-flash `
@@ -179,7 +179,7 @@ idf.py flash monitor
 android/                         Android Compose App
 firmware/matter_ws2812/          ESP32-C3 ESP-Matter 韌體
 release/                         可直接燒錄的 ESP 測試韌體
-  firmware-v0.4.0/
+  firmware-v0.4.4/
 README.md
 ```
 

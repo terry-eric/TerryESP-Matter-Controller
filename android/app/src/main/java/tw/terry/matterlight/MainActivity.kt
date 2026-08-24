@@ -81,6 +81,7 @@ import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.roundToInt
@@ -211,6 +212,32 @@ class MainActivity : ComponentActivity() {
             startGoogleSignIn()
             return
         }
+        if (target != null) {
+            lifecycleScope.launch {
+                runCatching {
+                    LocalEspApi.openMatterCommissioning(target)
+                    // The ESP schedules this work on the Matter thread. Give DNS-SD/BLE
+                    // advertising time to become visible before Google starts discovery.
+                    delay(1_200)
+                }.onSuccess {
+                    launchGoogleCommissioning(target)
+                }.onFailure { error ->
+                    commissioningInProgress = false
+                    commissioningLocalDeviceId = null
+                    Log.e("MatterLight", "Unable to open ESP Matter commissioning window", error)
+                    commissioningRecoveryMessage = if (error.message.orEmpty().contains("401")) {
+                        "燈條內的本地配對資料已更新。請重新執行一次「藍牙本地配對」，App 會自動取回資料；不需要手動輸入任何金鑰。"
+                    } else {
+                        "無法讓燈條進入 Matter 配對模式。請確認手機和燈條在同一個 Wi-Fi，再按一次加入 Matter。"
+                    }
+                }
+            }
+            return
+        }
+        launchGoogleCommissioning(null)
+    }
+
+    private fun launchGoogleCommissioning(target: LightDevice?) {
         // This path is intentionally Google Home only. Local BLE provisioning is a
         // separate flow and never calls the Google commissioning API.
         devicesBeforeCommissioning = GoogleHomeBridge.lights.value.map { it.id }.toSet()
@@ -218,6 +245,8 @@ class MainActivity : ComponentActivity() {
         commissioningRecoveryMessage = null
         val requestBuilder = CommissioningRequest.builder().setStoreToGoogleFabric(true)
         if (target != null) {
+            // The pairing code is supplied by the app. The user is never asked for
+            // the local API key or another Matter code in this upgrade flow.
             requestBuilder
                 .setOnboardingPayload(DEVELOPMENT_MATTER_PAIRING_CODE)
                 .setDeviceNameHint(target.name)
@@ -609,6 +638,10 @@ private fun LocalMatterDeviceDialog(
         title = { Text("選擇區網裝置", fontWeight = FontWeight.Bold) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    "App 會使用藍牙配對時保存的裝置資料，不需要再輸入本地金鑰或 Matter 配對碼。",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
                 if (devices.isEmpty()) {
                     Text("目前沒有只有區網控制的裝置。請先使用藍牙本地配對。")
                 } else {

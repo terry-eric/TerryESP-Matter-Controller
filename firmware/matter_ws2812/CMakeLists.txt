@@ -6,8 +6,8 @@ endif()
 
 set(ESP_MATTER_PATH $ENV{ESP_MATTER_PATH})
 set(MATTER_SDK_PATH ${ESP_MATTER_PATH}/connectedhomeip/connectedhomeip)
-set(PROJECT_VER "0.4.0")
-set(PROJECT_VER_NUMBER 4)
+set(PROJECT_VER "0.4.4")
+set(PROJECT_VER_NUMBER 8)
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 include(${ESP_MATTER_PATH}/examples/common/cmake_common/components_include.cmake)
